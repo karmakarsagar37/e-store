@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from src.db import db_name
+
 from src.services.items import ItemService
 
 

@@ -2,3 +2,4 @@ flask
 werkzeug
 coverage
 Flask-PyMongo
+python-dotenv

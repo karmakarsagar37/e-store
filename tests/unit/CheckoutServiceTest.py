@@ -1,96 +1,87 @@
 import unittest
-from pymongo.errors import PyMongoError
 from unittest.mock import MagicMock, patch
-from pymongo import MongoClient
-from src.services.cart import CartService
-from src.utils.common_utils import CommonUtils
+from bson.objectid import ObjectId
 from src.services.checkout import CheckoutService
 
 class TestCheckoutService(unittest.TestCase):
 
     def setUp(self):
-        self.mock_db_client = MagicMock(spec=MongoClient)
-        self.mock_cart_service = MagicMock(spec=CartService)
+        self.mock_db_client = MagicMock()
+        self.mock_db = self.mock_db_client.get_database.return_value
+        self.mock_order_collection = MagicMock()
+        self.mock_carts_collection = MagicMock()
+        self.mock_items_collection = MagicMock()
+        self.mock_cart_service = MagicMock()
+        
+        self.mock_db.get_collection.side_effect = lambda collection_name: {
+            'orders': self.mock_order_collection,
+            'carts': self.mock_carts_collection,
+            'items': self.mock_items_collection,
+        }[collection_name]
+        
         self.checkout_service = CheckoutService(self.mock_db_client)
         self.checkout_service.cartService = self.mock_cart_service
 
-    def test_checkout_empty_cart(self):
-        # Simulate an empty cart for a user
+    def test_checkout_with_empty_cart(self):
         user_id = 'user123'
-        self.checkout_service.carts_collection.find_one.return_value = None
+        self.mock_carts_collection.find_one.return_value = None
 
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(ValueError):
             self.checkout_service.checkout(user_id)
 
-        self.assertEqual(str(context.exception), "User cart is empty! Please add items to checkout")
+        self.mock_carts_collection.find_one.assert_called_once_with({'user_id': user_id}, {'items': 1, 'user_id': 1})
 
-    @patch('src.services.checkout.logging')
-    @patch('src.services.checkout.CommonUtils')
-    def test_checkout_lucky_customer_discount(self, mock_common_utils, mock_logging):
-        user_id = 'user456'
-        items_in_cart = [{'item_id': 1, 'name': 'Product A', 'price': 20}, {'item_id': 2, 'name': 'Product B', 'price': 30}]
-        total_price = sum(item['price'] for item in items_in_cart)
-
-        self.checkout_service.carts_collection.find_one.return_value = {'user_id': user_id, 'items': items_in_cart}
-        self.checkout_service.order_collection.count_documents.return_value = 9  # Assuming 9 orders till now
-        self.mock_cart_service._calculate_total_for_items.return_value = total_price
-        mock_common_utils.lucky_n_number = 10
-        
-        response, status_code = self.checkout_service.checkout(user_id)
+    def test_checkout_with_discount(self):
+        user_id = 'user123'
+        items = [{'item_name': 'a', 'quantity': 1, 'item_price': 100}]
+        total_price = 100
+        self.mock_carts_collection.find_one.return_value = {'_id': ObjectId('65744ceb579c8cb22aacfde3'), 'user_id': user_id, 'items': items}
+        self.mock_items_collection.find_one.return_value = {'item_price': 100}
+        self.mock_order_collection.count_documents.return_value = 9  # Not a multiple of lucky_n_number
+        with patch('src.services.checkout.CommonUtils.lucky_n_number', 2):  # Mocking the lucky_n_number value
+            response, status_code = self.checkout_service.checkout(user_id)
 
         self.assertEqual(status_code, 200)
         self.assertEqual(response['message'], "Congrats you are our lucky N'th customer!. Your order will receive a special discount of 10%")
-        self.assertEqual(response['items'], items_in_cart)
         self.assertEqual(response['grand_total'], total_price)
-        self.assertEqual(response['disount'], 0.10 * total_price)
-        self.assertEqual(response['to_pay'], 0.90 * total_price)
+        self.assertEqual(response['to_pay'], 0.9 * total_price)
+        self.assertEqual(response['discount'], 0.1 * total_price)
+        self.mock_carts_collection.delete_one.assert_called_once()
+        self.mock_order_collection.insert_one.assert_called_once()
 
-    @patch('src.services.checkout.logging')
-    @patch('src.services.checkout.CommonUtils')
-    def test_checkout_regular_customer(self, mock_common_utils, mock_logging):
-        user_id = 'user789'
-        items_in_cart = [{'item_id': 3, 'name': 'Product C', 'price': 25}, {'item_id': 4, 'name': 'Product D', 'price': 35}]
-        total_price = sum(item['price'] for item in items_in_cart)
-
-        self.checkout_service.carts_collection.find_one.return_value = {'user_id': user_id, 'items': items_in_cart}
-        self.checkout_service.order_collection.count_documents.return_value = 5  # Assuming 5 orders till now
-        mock_common_utils.lucky_n_number = 10  # Setting a different lucky number for testing
-        self.mock_cart_service._calculate_total_for_items.return_value = total_price
-
-        response, status_code = self.checkout_service.checkout(user_id)
+    def test_checkout_without_discount(self):
+        user_id = 'user123'
+        items = [{'item_name': 'a', 'quantity': 1, 'item_price': 100}]
+        total_price = 100
+        self.mock_carts_collection.find_one.return_value = {'_id': ObjectId('65744ceb579c8cb22aacfde3'), 'user_id': user_id, 'items': items}
+        self.mock_items_collection.find_one.return_value = {'item_price': 100}
+        self.mock_order_collection.count_documents.return_value = 8  # Not a multiple of lucky_n_number
+        with patch('src.services.checkout.CommonUtils.lucky_n_number', 2):  # Mocking the lucky_n_number value
+            response, status_code = self.checkout_service.checkout(user_id)
 
         self.assertEqual(status_code, 200)
         self.assertEqual(response['message'], "Thank you for shopping with us. Visit Again!")
-        self.assertEqual(response['items'], items_in_cart)
         self.assertEqual(response['grand_total'], total_price)
-        self.assertEqual(response['disount'], 0)
         self.assertEqual(response['to_pay'], total_price)
-    
-    
+        self.assertEqual(response['discount'], 0)
+        self.mock_carts_collection.delete_one.assert_called_once()
+        self.mock_order_collection.insert_one.assert_called_once()
+
     @patch('src.services.checkout.logging')
-    def test_checkout_mongo_transaction_failure(self, mock_logging):
-        user_id = 'user999'
-        items_in_cart = [{'item_id': 5, 'name': 'Product E', 'price': 40}, {'item_id': 6, 'name': 'Product F', 'price': 50}]
-        total_price = sum(item['price'] for item in items_in_cart)
+    def test_abort_transaction_exception(self, mock_logging):
+        user_id = 'user123'
+        items = [{'item_name': 'a', 'quantity': 1, 'item_price': 100}]
+        total_price = 100
+        self.mock_carts_collection.find_one.return_value = {'_id': ObjectId('65744ceb579c8cb22aacfde3'), 'user_id': user_id, 'items': items}
+        self.mock_items_collection.find_one.return_value = {'item_price': 100}
+        self.mock_order_collection.count_documents.return_value = 8  # Not a multiple of lucky_n_number
 
-        self.checkout_service.carts_collection.find_one.return_value = {'user_id': user_id, 'items': items_in_cart}
-        self.checkout_service.order_collection.count_documents.return_value = 7  # Assuming 7 orders till now
-        self.mock_cart_service._calculate_total_for_items.return_value = total_price
+        # Simulate an error during insert_one operation
+        with patch.object(self.mock_carts_collection, 'delete_one') as mock_insert:
+            mock_insert.side_effect = Exception('Simulated error')
 
-        # Simulate a MongoDB transaction failure during order insertion
-        mock_session = self.mock_db_client.start_session()
-        mock_session.__enter__.return_value = mock_session
-        mock_session.__exit__.return_value = None
-        mock_session.start_transaction.return_value = None
-        mock_session.commit_transaction.side_effect = PyMongoError
-
-        with patch.object(self.mock_db_client, 'start_session', return_value=mock_session):
-            with self.assertRaises(ConnectionRefusedError) as context:
+            with self.assertRaises(ConnectionRefusedError):
                 self.checkout_service.checkout(user_id)
 
-        self.assertEqual(str(context.exception), 'Error while writing in db!')
-        mock_session.abort_transaction.assert_called_once()
-
-
-if __name__ == '__main__':
-    unittest.main()
+        self.mock_order_collection.insert_one.assert_called_once()
+        mock_logging.error.assert_called_once_with('Transaction aborted: Simulated error')

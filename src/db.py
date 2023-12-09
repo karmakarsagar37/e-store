@@ -1,9 +1,13 @@
 import pymongo
+import os
+import urllib.parse
 
 class Database:
     def __init__(self) -> None:
-        self.MONGODB_URL = 'mongodb+srv://sagar:sagar12345@cluster0.ryfnwqt.mongodb.net/?retryWrites=true&w=majority'
-        self.DB_NAME = 'store'
+        self.username = urllib.parse.quote_plus(str(os.environ.get("DB_USERNAME")))
+        self.password = urllib.parse.quote_plus(str(os.environ.get("DB_PASSWORD")))
+        self.MONGODB_URL = f'mongodb+srv://{self.username}:{self.password}@web.pqkfpsb.mongodb.net/?retryWrites=true&w=majority'
+        self.DB_NAME = os.environ.get('DB_NAME')
     def get_client(self) -> pymongo.MongoClient:
         return pymongo.MongoClient(self.MONGODB_URL)
     def get_db_name(self) -> str:
