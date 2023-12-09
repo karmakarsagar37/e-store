@@ -1,10 +1,12 @@
 import logging
+from src.db import db_name
 logging.basicConfig(level=logging.INFO)
 
 class ItemService:
     def __init__(self, database_client) -> None:
         self.database_client = database_client
-        self.items_collection = self.database_client['items']
+        self.database = database_client.get_database(db_name)
+        self.items_collection = self.database['items']
         
     def add_items(self, item_list: list):
         items = []

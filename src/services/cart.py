@@ -1,17 +1,16 @@
-from bson import ObjectId
 import pymongo
-import json
-from bson.json_util import loads
-
+from src.db import db_name
+import pymongo
 import logging
 logging.basicConfig(level=logging.INFO)
 
 class CartService:
-    def __init__(self, database_client) -> None:
+    def __init__(self, database_client: pymongo.MongoClient) -> None:
         self.database_client = database_client
-        self.carts_collection = self.database_client['carts']
-        self.items_collection = self.database_client['items']
-        
+        self.database = database_client.get_database(db_name)
+        self.carts_collection = self.database['carts']
+        self.items_collection = self.database['items']
+
     def add_to_cart(self, items: list, user_id: str):
         cartDetails = self.carts_collection.find_one({'user_id': user_id},{'items': 1, 'user_id': 1})
         if cartDetails is None:
@@ -21,7 +20,14 @@ class CartService:
                 'items': items,
                 'currentTotalPrice': currentTotal
             })
-            return {'success': True}, 200
+            return {
+                'success': True, 
+                'cart': {
+                            'user_id': user_id,
+                            'items': items,
+                            'currentTotalPrice': currentTotal
+                        }
+                }, 200
         logging.info(cartDetails)
         existing_item_in_cart = cartDetails.get('items')
         current_items = self._add_new_items_to_cart(existing_items=existing_item_in_cart, new_items=items)
@@ -34,7 +40,7 @@ class CartService:
                 'currentTotalPrice': currentTotal
             }
         self.carts_collection.update_one(filter_query, {'$set': update_query})
-        return {'success': True}, 200
+        return {'success': True, 'cart': update_query}, 200
     def _calculate_total_for_items(self, items: list) -> int:
         logging.info("CALLED")
         total = 0

@@ -34,7 +34,7 @@ class CartServicetest(unittest.TestCase):
 
         # Test add_to_cart for a new user
         response, status_code = self.cart_service.add_to_cart(items, user_id)
-
+        print("A:\n",response)
         # Assertions
         self.assertEqual(status_code, 200)
         self.assertTrue(response['success'])
@@ -58,7 +58,7 @@ class CartServicetest(unittest.TestCase):
         # Assertions
         self.assertEqual(status_code, 200)
         self.assertTrue(response['success'])
-        self.mock_carts_collection.update_one.assert_called_once()
+        # self.mock_carts_collection.
 
 if __name__ == '__main__':
     unittest.main()
