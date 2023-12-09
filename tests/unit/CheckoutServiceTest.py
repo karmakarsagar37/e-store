@@ -81,7 +81,8 @@ class TestCheckoutService(unittest.TestCase):
             mock_insert.side_effect = Exception('Simulated error')
 
             with self.assertRaises(ConnectionRefusedError):
-                self.checkout_service.checkout(user_id)
+                with patch('src.services.checkout.CommonUtils.lucky_n_number', 2):  # Mocking the lucky_n_number value
+                    self.checkout_service.checkout(user_id)
 
         self.mock_order_collection.insert_one.assert_called_once()
         mock_logging.error.assert_called_once_with('Transaction aborted: Simulated error')

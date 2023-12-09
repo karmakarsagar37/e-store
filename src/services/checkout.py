@@ -30,6 +30,7 @@ class CheckoutService:
         
         orders_till_now = self.order_collection.count_documents({})
         response = {}
+        print(CommonUtils.lucky_n_number)
         # Checking if the user's order makes them eligible for a special discount
         if (orders_till_now + 1) % CommonUtils.lucky_n_number == 0:
             response = {
