@@ -23,7 +23,7 @@ This repository contains the backend implementation of an e-commerce store that 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your-username/e-commerce-backend.git
+    git clone https://github.com/karmakarsagar37/e-store.git
     ```
 2. Create a virtual environment and activate
     ```bash
