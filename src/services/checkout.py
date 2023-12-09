@@ -9,11 +9,10 @@ class CheckoutService:
     def __init__(self, database_client: pymongo.MongoClient) -> None:
         self.database_client = database_client
         self.database = database_client.get_database(db_name)
-        self.order_collection = self.database['orders']
-        self.carts_collection = self.database['carts']
+        self.order_collection = self.database.get_collection('orders')
+        self.carts_collection = self.database.get_collection('carts')
         self.cartService = CartService(database_client=database_client)
-        print(self.database.list_collections())
-    
+
     def checkout(self, user_id: str):
         cartDetails = self.carts_collection.find_one({'user_id': user_id},{'items': 1, 'user_id': 1})
         if cartDetails is None:
@@ -54,7 +53,7 @@ class CheckoutService:
             except Exception as e:
                 # Rollback the transaction if any error occurs
                 session.abort_transaction()
-                print(f"Transaction aborted: {e}")
+                logging.error(f"Transaction aborted: {e}")
                 raise ConnectionRefusedError('Error while writing in db!')
         
         return response, 200

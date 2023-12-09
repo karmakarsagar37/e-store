@@ -8,8 +8,8 @@ class CartService:
     def __init__(self, database_client: pymongo.MongoClient) -> None:
         self.database_client = database_client
         self.database = database_client.get_database(db_name)
-        self.carts_collection = self.database['carts']
-        self.items_collection = self.database['items']
+        self.carts_collection = self.database.get_collection('carts')
+        self.items_collection = self.database.get_collection('items')
 
     def add_to_cart(self, items: list, user_id: str):
         cartDetails = self.carts_collection.find_one({'user_id': user_id},{'items': 1, 'user_id': 1})
@@ -41,8 +41,8 @@ class CartService:
             }
         self.carts_collection.update_one(filter_query, {'$set': update_query})
         return {'success': True, 'cart': update_query}, 200
+    
     def _calculate_total_for_items(self, items: list) -> int:
-        logging.info("CALLED")
         total = 0
         logging.info(items)
         for item in items:
@@ -51,6 +51,7 @@ class CartService:
             logging.info(f'Price: {item_price}')
             total = total + (item_price * item['quantity'])
         return total
+    
     def _add_new_items_to_cart(self, existing_items: list, new_items: list):
         for new_item in new_items:
             item_name = new_item['item_name']
