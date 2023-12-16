@@ -10,5 +10,5 @@ app.register_blueprint(cart_apis)
 app.register_blueprint(checkout_apis)
 
 if __name__ == '__main__':
-    load_dotenv()
+    # load_dotenv()
     app.run(debug=True, port=5000)
